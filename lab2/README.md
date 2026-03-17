@@ -1,0 +1,1 @@
+# JezykiSkryptowe lab 2
