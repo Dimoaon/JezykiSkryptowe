@@ -1,18 +1,8 @@
 import sys
-from core.cleaner import clean_text
-from core.parser import process_sentences
-from core.utils import count_sentences
+from core.cleaner import clean_stream
 
 def main():
-    text = sys.stdin.read()
-
-    cleaned = clean_text(text)
-
-    process, result = count_sentences()
-
-    process_sentences(cleaned, process)
-
-    print(result())
+    clean_stream(sys.stdin, sys.stdout)
 
 if __name__ == "__main__":
     main()
