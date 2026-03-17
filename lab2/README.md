@@ -49,13 +49,13 @@ process_sentences(text, process_function)
 
 ## Podział pracy
 
-### Moja część
+### Dzmitry Skavarodka
 - cleaner  
 - parser  
 - struktura projektu  
 - pipeline (stdin → output)
 
-### Partner
+### Szymon Majerczk
 Do zrobienia w `utils.py`:
 - count_words()
 - average_sentence_length()
