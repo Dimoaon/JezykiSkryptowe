@@ -1,30 +1,42 @@
-def process_sentences(text, process_function):
-    sentence = ""
+def iter_characters(source):
+    if hasattr(source, "read"):
+        while True:
+            char = source.read(1)
+            if not char:
+                break
+            yield char
+        return
 
-    i = 0
-    while i < len(text):
-        c = text[i]
-        sentence += c
+    for char in source:
+        yield char
+
+
+def process_sentences(source, process_function):
+    sentence = ""
+    previous_char = ""
+
+    for char in iter_characters(source):
+        sentence += char
 
         # koniec zdania po znaku interpunkcyjnym
-        if c in ".!?":
+        if char in ".!?":
             # sprawdzenie: czy to nie jest jedyna litera (np. "I.")
             if len(sentence.strip()) <= 3:
-                i += 1
+                previous_char = char
                 continue
 
             process_function(sentence.strip())
             sentence = ""
 
         # koniec akapitu = koniec zdania
-        elif c == "\n":
+        elif char == "\n":
             # jezeli wystepuje podwojny znak nowej linii
-            if i + 1 < len(text) and text[i + 1] == "\n":
+            if previous_char == "\n":
                 if sentence.strip():
                     process_function(sentence.strip())
                     sentence = ""
 
-        i += 1
+        previous_char = char
 
     # pozostala czesc
     if sentence.strip():

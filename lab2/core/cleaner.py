@@ -1,33 +1,64 @@
-def clean_text(text):
-    lines = text.split("\n")
+from io import StringIO
 
-    # --- 1. USUWAMY KONCOWKE (po -----) ---
-    cleaned_lines = []
-    for line in lines:
-        if line.strip() == "-----":
-            break
-        cleaned_lines.append(line)
 
-    # --- 2. USUWAMY PREAMBULE ---
-    start_index = 0
-    empty_count = 0
+def normalize_line(line):
+    result = ""
+    pending_space = False
+    i = 0
 
-    for i in range(min(10, len(cleaned_lines))):
-        if cleaned_lines[i].strip() == "":
-            empty_count += 1
-            if empty_count == 2:
-                start_index = i + 1
-                break
+    while i < len(line):
+        char = line[i]
+        if char in " \t\r\n":
+            if result:
+                pending_space = True
         else:
-            empty_count = 0
+            if pending_space:
+                result += " "
+                pending_space = False
+            result += char
+        i += 1
 
-    content = cleaned_lines[start_index:]
+    return result
 
-    # --- 3. CZYSZCZENIE SPACJI ---
-    result = []
-    for line in content:
-        # usuwamy nadmiarowe spacje wewnatrz linii
-        cleaned = " ".join(line.strip().split())
-        result.append(cleaned)
 
-    return "\n".join(result)
+def clean_stream(input_stream, output_stream):
+    buffer = ""
+    checked_lines = 0
+    empty_count = 0
+    content_started = False
+
+    for raw_line in input_stream:
+        cleaned_line = normalize_line(raw_line)
+
+        if cleaned_line == "-----":
+            break
+
+        if not content_started:
+            checked_lines += 1
+            buffer += cleaned_line + "\n"
+
+            if cleaned_line == "":
+                empty_count += 1
+                if empty_count == 2:
+                    buffer = ""
+                    content_started = True
+            else:
+                empty_count = 0
+
+            if checked_lines == 10 and not content_started:
+                output_stream.write(buffer)
+                buffer = ""
+                content_started = True
+            continue
+
+        output_stream.write(cleaned_line + "\n")
+
+    if not content_started:
+        output_stream.write(buffer)
+
+
+def clean_text(text):
+    input_stream = StringIO(text)
+    output_stream = StringIO()
+    clean_stream(input_stream, output_stream)
+    return output_stream.getvalue()

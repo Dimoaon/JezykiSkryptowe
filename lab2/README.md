@@ -1,8 +1,12 @@
-# Lab 2 – Text Processing
+# Lab 2 - Text Processing
 
 ## Opis
-Program czyta tekst ze stdin, czyści go i dzieli na zdania.  
-Następnie można wykonywać różne operacje na zdaniach (np. liczenie).
+Program czyta dane ze standardowego wejscia i wypisuje tylko tresc ksiazki:
+- bez preambuly,
+- bez informacji o wydaniu po linii `-----`,
+- z zachowaniem struktury akapitow,
+- po usunieciu zbednych spacji na poczatku i koncu linii
+  oraz nadmiarowych bialych znakow wewnatrz linii.
 
 ---
 
@@ -35,11 +39,11 @@ python lab_2.py < data/ojciec_goriot.txt
 
 ## Jak działa
 
-- `cleaner.py` – usuwa nagłówki i zbędny tekst  
-- `parser.py` – dzieli tekst na zdania  
-- `utils.py` – funkcje do przetwarzania zdań  
+- `cleaner.py` - czyta dane potokowo i usuwa preambule oraz informacje o wydaniu
+- `parser.py` - dzieli tekst na zdania i jest przygotowany pod dalsze funkcjonalnosci
+- `utils.py` - miejsce na kolejne funkcje przetwarzajace zdania
 
-Parser wywołuje funkcję dla każdego zdania:
+Parser wywoluje funkcje dla kazdego zdania:
 
 ```
 process_sentences(text, process_function)
@@ -50,9 +54,10 @@ process_sentences(text, process_function)
 ## Podział pracy
 
 ### Dzmitry Skavarodka
-- cleaner  
-- parser  
-- struktura projektu  
+- cleaner
+- parser
+- przetwarzanie potokowe stdin -> stdout
+- struktura projektu
 - pipeline (stdin → output)
 
 ### Szymon Majerczk
@@ -75,6 +80,7 @@ def example():
 
 ## Status
 
-- ✔ działa  
-- ✔ parser i cleaner gotowe  
-- 🔄 utils do uzupełnienia  
+- ✔ dziala czyszczenie tekstu ze stdin
+- ✔ zachowana struktura akapitow
+- ✔ `__main__` w `lab_2.py`
+- 🔄 funkcje w `utils.py` do uzupelnienia
