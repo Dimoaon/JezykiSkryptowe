@@ -60,7 +60,7 @@ process_sentences(text, process_function)
 - struktura projektu
 - pipeline (stdin → output)
 
-### Szymon Majerczk
+### Szymon Majerczak
 Do zrobienia w `utils.py`:
 - count_words()
 - average_sentence_length()
