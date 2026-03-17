@@ -1,14 +1,14 @@
 def clean_text(text):
     lines = text.split("\n")
 
-    # --- 1. УБИРАЕМ ХВОСТ (после -----) ---
+    # --- 1. USUWAMY KONCOWKE (po -----) ---
     cleaned_lines = []
     for line in lines:
         if line.strip() == "-----":
             break
         cleaned_lines.append(line)
 
-    # --- 2. УБИРАЕМ ПРЕАМБУЛУ ---
+    # --- 2. USUWAMY PREAMBULE ---
     start_index = 0
     empty_count = 0
 
@@ -23,10 +23,10 @@ def clean_text(text):
 
     content = cleaned_lines[start_index:]
 
-    # --- 3. ЧИСТИМ ПРОБЕЛЫ ---
+    # --- 3. CZYSZCZENIE SPACJI ---
     result = []
     for line in content:
-        # убираем лишние пробелы внутри строки
+        # usuwamy nadmiarowe spacje wewnatrz linii
         cleaned = " ".join(line.strip().split())
         result.append(cleaned)
 
