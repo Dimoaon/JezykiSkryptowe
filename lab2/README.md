@@ -27,6 +27,8 @@ Z folderu `lab2`:
 
 ```
 python lab_2.py < data/krolowa_sniegu.txt
+python lab_2.py < data/dziewczynka_z_zapalkami.txt
+python lab_2.py < data/ojciec_goriot.txt
 ```
 
 ---
