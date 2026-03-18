@@ -20,11 +20,6 @@ def process_sentences(source, process_function):
 
         # koniec zdania po znaku interpunkcyjnym
         if char in ".!?":
-            # sprawdzenie: czy to nie jest jedyna litera (np. "I.")
-            if len(sentence.strip()) <= 3:
-                previous_char = char
-                continue
-
             process_function(sentence.strip())
             sentence = ""
 

@@ -1,4 +1,5 @@
 from io import StringIO
+import sys
 
 
 def normalize_line(line):
@@ -62,3 +63,7 @@ def clean_text(text):
     output_stream = StringIO()
     clean_stream(input_stream, output_stream)
     return output_stream.getvalue()
+
+
+if __name__ == "__main__":
+    clean_stream(sys.stdin, sys.stdout)
