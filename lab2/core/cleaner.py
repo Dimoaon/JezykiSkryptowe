@@ -33,8 +33,11 @@ def iter_clean_chunks(input_stream):
     checked_lines = 0
     empty_count = 0
     content_started = False
+    saw_input = False
+    has_text_content = False
 
     for raw_line in input_stream:
+        saw_input = True
         cleaned_line = normalize_line(raw_line)
 
         # Linia z piecioma myslnikami oznacza poczatek informacji o wydaniu.
@@ -58,16 +61,30 @@ def iter_clean_chunks(input_stream):
             if checked_lines == 10 and not content_started:
                 # Jesli w pierwszych 10 liniach nie ma dwoch pustych wierszy,
                 # uznajemy, ze preambuly nie bylo i wypisujemy bufor jako tresc.
+                has_text_content = has_text_content or any(
+                    not char.isspace() for char in buffer
+                )
                 yield buffer
                 buffer = ""
                 content_started = True
             continue
 
         # Gdy tresc sie juz zaczela, zwracamy kolejne oczyszczone linie.
+        if cleaned_line:
+            has_text_content = True
         yield cleaned_line + "\n"
 
     if not content_started and buffer:
+        has_text_content = has_text_content or any(
+            not char.isspace() for char in buffer
+        )
         yield buffer
+
+    if not saw_input:
+        raise ValueError("Puste dane wejściowe.")
+
+    if not has_text_content:
+        raise ValueError("Brak treści książki po oczyszczeniu.")
 
 
 def iter_clean_characters(input_stream):
