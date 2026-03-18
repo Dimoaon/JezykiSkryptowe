@@ -1,25 +1,16 @@
-#Funkcje redukujace
+# W tym pliku trzymamy wspolna logike dla wszystkich skryptow.
+# Kazda funkcja zwraca:
+# - funkcje "process", ktora wykonuje prace na pojedynczym elemencie
+# - funkcje "result", ktora zwraca wynik koncowy
+# Taki uklad dobrze pasuje do przetwarzania potokowego.
 
-def count_words():
-    count = 0
 
-    def process(sentence):
-        nonlocal count
-        in_word = False
-
-        for c in sentence:
-            if c.isalpha():
-                if not in_word:
-                    count += 1
-                    in_word = True
-            else:
-                in_word = False
-
-        return ""
-
-    return process, lambda: count
+# Funkcje redukujace
 
 def count_paragraphs():
+    # Liczymy akapity na podstawie znakow:
+    # nowy akapit zaczyna sie tam, gdzie po pustej linii
+    # pojawia sie pierwszy niebialy znak.
     count = 0
     in_paragraph = False
     previous_char = ""
@@ -28,9 +19,11 @@ def count_paragraphs():
         nonlocal count, in_paragraph, previous_char
 
         if char == "\n":
+            # Podwojny enter oznacza wyjscie z aktualnego akapitu.
             if previous_char == "\n":
                 in_paragraph = False
         else:
+            # Pierwszy znak po pustej linii rozpoczyna nowy akapit.
             if not in_paragraph and not char.isspace():
                 count += 1
                 in_paragraph = True
@@ -45,20 +38,21 @@ def count_paragraphs():
 
 
 def count_characters():
+    # Liczymy wszystkie znaki oprocz bialych znakow.
     count = 0
 
-    def process(sentence):
+    def process(char):
         nonlocal count
 
-        for c in sentence:
-            if not c.isspace():
-                count += 1
-
-        return ""
+        if not char.isspace():
+            count += 1
 
     return process, lambda: count
 
 def percent_sentences_with_proper_noun():
+    # Liczymy procent zdan, w ktorych wystepuje nazwa wlasna.
+    # W tym uproszczeniu nazwa wlasna to slowo zapisane wielka litera,
+    # ale nie pierwsze slowo w zdaniu.
     total_sentences = 0
     sentences_with_proper = 0
 
@@ -84,6 +78,8 @@ def percent_sentences_with_proper_noun():
             if start < i:
                 word = sentence[start:i]
 
+                # Pomijamy pierwsze slowo, bo ono czesto zaczyna sie wielka litera
+                # tylko dlatego, ze stoi na poczatku zdania.
                 if word_index > 0 and word[0].isupper():
                     has_proper = True
 
@@ -103,9 +99,10 @@ def percent_sentences_with_proper_noun():
 
 
 
-#Wyszukujace
+# Funkcje wyszukujace
 
 def longest_sentence():
+    # Zapamietujemy najdluzsze zdanie wedlug liczby znakow.
     longest = ""
 
     def process(sentence):
@@ -119,6 +116,8 @@ def longest_sentence():
     return process, lambda: longest
 
 def longest_sentence_no_same_start_letters():
+    # Szukamy najdluzszego zdania, w ktorym dwa sasiednie slowa
+    # nie zaczynaja sie od tej samej litery.
     best = ""
 
     def process(sentence):
@@ -143,7 +142,8 @@ def longest_sentence_no_same_start_letters():
             while i < len(sentence) and sentence[i].isalpha():
                 i += 1
 
-            # sprawdzam warunkek
+            # Jesli dwa kolejne slowa zaczynaja sie od tej samej litery,
+            # zdanie nie spelnia warunku.
             if prev_first_letter == first_letter:
                 valid = False
 
@@ -160,6 +160,8 @@ def longest_sentence_no_same_start_letters():
 
 
 def first_sentence_with_multiple_clauses():
+    # Za zdanie z wiecej niz jednym zdaniem podrzednym
+    # przyjmujemy tu pierwsze zdanie z co najmniej dwoma przecinkami.
     found = ""
 
     def process(sentence):
@@ -182,9 +184,10 @@ def first_sentence_with_multiple_clauses():
     return process, lambda: found
 
 
-#filtrujace
+# Funkcje filtrujace
 
 def filter_sentences_max_4_words():
+    # Zwracamy tylko zdania, ktore maja najwyzej 4 wyrazy.
     def process(sentence):
         word_count = 0
         in_word = False
@@ -205,6 +208,7 @@ def filter_sentences_max_4_words():
     return process
 
 def filter_questions_and_exclamations():
+    # Zostawiamy tylko zdania zakonczone znakiem ? albo !.
     def process(sentence):
         sentence = sentence.strip()
 
@@ -216,6 +220,7 @@ def filter_questions_and_exclamations():
     return process
 
 def first_20_sentences():
+    # Przepuszczamy tylko pierwsze 20 zdan.
     count = 0
 
     def process(sentence):
@@ -230,6 +235,8 @@ def first_20_sentences():
     return process
 
 def filter_sentences_with_conjunctions():
+    # Zostawiamy tylko zdania zawierajace co najmniej dwa wyrazy
+    # z listy podanej w PDF: i, oraz, ale, że, lub.
     def process(sentence):
         i = 0
         count = 0
@@ -256,4 +263,3 @@ def filter_sentences_with_conjunctions():
         return ""
 
     return process
-
