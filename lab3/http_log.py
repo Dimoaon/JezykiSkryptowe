@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 # Kolejność elementów w krotce jest stała
-# i odpowiada polom używanym w zadaniach 1-10.
+# i odpowiada polom używanym w zadaniach
 ENTRY_LENGTH = 10
 TS = 0
 UID = 1
