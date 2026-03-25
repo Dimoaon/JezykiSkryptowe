@@ -20,8 +20,9 @@ W katalogu `lab3` znajduje się rozwiązanie zadań `1-20` z laboratorium 3.
 - `get_entries_in_time_range(log, start, end)`
 - `count_by_method(log)`
 - `get_top_uris(log, n=10)`
-- `count_status_classes(log`
+- `count_status_classes(log)`
 - `entry_to_dict(entry)`
+- `log_to_dict(log)`
 - `print_dict_entry_dates(log_dict)`
 - `get_most_active_session(log_dict)`
 - `get_session_paths(log)`
@@ -34,7 +35,7 @@ W katalogu `lab3` znajduje się rozwiązanie zadań `1-20` z laboratorium 3.
 Z katalogu głównego projektu:
 
 ```bash
-python3 lab3/http_log.py < lab3/data/text.log
+python3 lab3/http_log.py < lab3/data/http_first_100k.log
 ```
 
 Po uruchomieniu program wypisuje przykładowe wyniki dla wszystkich funkcji

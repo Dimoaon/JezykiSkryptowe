@@ -19,6 +19,17 @@ URI = 8
 STATUS_CODE = 9
 
 
+def _normalize_line(line):
+    # Pozwala odczytać zwykły log oraz wariant zapisany z zerowymi bajtami.
+    return (
+        line.replace("\ufeff", "")
+        .replace("\udcff", "")
+        .replace("\udcfe", "")
+        .replace("\x00", "")
+        .replace("\r", "")
+    )
+
+
 def _parse_timestamp(value):
     # UNIX timestamp interpretujemy w czasie UTC,
     # żeby wynik nie zależał od lokalnej strefy czasowej komputera.
@@ -26,6 +37,7 @@ def _parse_timestamp(value):
 
 
 def _parse_optional_text(value):
+    # W logu znak "-" oznacza brak wartości.
     value = value.strip()
     if value == "-":
         return None
@@ -33,6 +45,8 @@ def _parse_optional_text(value):
 
 
 def _parse_optional_int(value):
+    # Dla pól liczbowych stosujemy tę samą zasadę co wyżej:
+    # "-" zamieniamy na None, a resztę na int.
     value = value.strip()
     if value == "-":
         return None
@@ -42,7 +56,11 @@ def _parse_optional_int(value):
 def _parse_line(line):
     fields = line.rstrip("\n").split("\t")
 
-    # Tworzymy krotkę zawierającą co najmniej pola opisane w zadaniu 0.
+    if len(fields) < 15:
+        raise ValueError("Linia logu ma za mało pól.")
+
+    # Tworzymy jedną krotkę z polami potrzebnymi w laboratorium.
+    # Bierzemy tylko te kolumny, których wymagają zadania.
     return (
         _parse_timestamp(fields[0]),
         fields[1],
@@ -62,8 +80,13 @@ def read_log():
     log = []
 
     for line in sys.stdin:
+        # Najpierw czyścimy linię z ewentualnych znaków technicznych.
+        line = _normalize_line(line)
+
         if line.strip() == "":
             continue
+
+        # Każdą poprawną linię zamieniamy na jedną krotkę.
         log.append(_parse_line(line))
 
     return log
@@ -92,6 +115,7 @@ def get_entries_by_code(log, code):
     result = []
 
     for entry in log:
+        # Porównujemy kod z pola STATUS_CODE w każdej krotce.
         if entry[STATUS_CODE] == code:
             result.append(entry)
 
@@ -104,6 +128,7 @@ def get_entries_by_addr(log, addr):
         raise ValueError("Adres nie może być pusty.")
 
     addr = addr.strip()
+    addr_lower = addr.lower()
     result = []
 
     # Jeśli tekst wygląda jak IPv4, sprawdzamy poprawność zapisu.
@@ -111,7 +136,12 @@ def get_entries_by_addr(log, addr):
         ipaddress.ip_address(addr)
 
     for entry in log:
-        if entry[ORIG_H] == addr or entry[HOST] == addr:
+        host = entry[HOST]
+
+        # Adres może pasować albo do IP klienta, albo do pola host.
+        if entry[ORIG_H] == addr:
+            result.append(entry)
+        elif host is not None and host.lower() == addr_lower:
             result.append(entry)
 
     return result
@@ -128,6 +158,7 @@ def get_failed_reads(log, merge=False):
         if status_code is None:
             continue
 
+        # Kody 4xx i 5xx zapisujemy osobno, bo tego wymaga treść zadania.
         if 400 <= status_code < 500:
             errors_4xx.append(entry)
         elif 500 <= status_code < 600:
@@ -145,11 +176,14 @@ def _get_extension_from_uri(uri):
 
     # Pomijamy parametry w URI, np. /image.jpg?width=1024.
     path = urlsplit(uri).path
+    segments = path.split("/")
 
-    if "." not in path:
-        return None
+    # Szukamy ostatniego segmentu, który naprawdę wygląda jak nazwa pliku.
+    for segment in reversed(segments):
+        if "." in segment:
+            return segment.rsplit(".", 1)[1].lower()
 
-    return path.rsplit(".", 1)[1].lower()
+    return None
 
 
 # Zadanie 6. Filtrowanie wpisów po rozszerzeniu pliku.
@@ -164,6 +198,7 @@ def get_entries_by_extension(log, ext):
     result = []
 
     for entry in log:
+        # Porównujemy rozszerzenie wyciągnięte z URI z wartością podaną przez użytkownika.
         if _get_extension_from_uri(entry[URI]) == ext:
             result.append(entry)
 
@@ -181,6 +216,7 @@ def get_top_ips(log, n=10):
     counter = Counter()
 
     for entry in log:
+        # Counter zlicza, ile razy pojawia się dany adres IP klienta.
         counter[entry[ORIG_H]] += 1
 
     return counter.most_common(n)
@@ -193,6 +229,8 @@ def get_unique_methods(log):
     for entry in log:
         method = entry[METHOD]
 
+        # Zachowujemy kolejność pierwszego wystąpienia metody
+        # i nie dodajemy duplikatów.
         if method is not None and method not in methods:
             methods.append(method)
 
@@ -207,6 +245,8 @@ def get_entries_in_time_range(log, start, end):
     result = []
 
     for entry in log:
+        # Zakres jest lewostronnie domknięty i prawostronnie otwarty:
+        # start <= ts < end
         if start <= entry[TS] < end:
             result.append(entry)
 
@@ -223,6 +263,7 @@ def count_by_method(log):
         if method is None:
             continue
 
+        # Jeśli metoda pojawia się pierwszy raz, zaczynamy licznik od zera.
         if method not in result:
             result[method] = 0
 
@@ -233,22 +274,23 @@ def count_by_method(log):
 # Zadanie 11. Najczęściej występujące URI
 def get_top_uris(log, n=10):
     if not isinstance(n, int):
-        raise TypeError("Wartość musi być liczbą całkowitą")
+        raise TypeError("Wartość musi być liczbą całkowitą.")
 
-    if n<=0:
-        raise ValueError("Podany argument n musi być większy od zera ")
+    if n <= 0:
+        raise ValueError("Podany argument n musi być większy od zera.")
 
     counter = Counter()
 
     for entry in log:
+        # Zliczamy tylko wpisy, które mają uzupełnione URI.
         if entry[URI] is not None:
             counter[entry[URI]] += 1
 
     return counter.most_common(n)
 
-#Zadanie 12. Grupowanie kodów HTTP
-def  count_status_classes(log):
-    counter={
+# Zadanie 12. Grupowanie kodów HTTP
+def count_status_classes(log):
+    counter = {
         "2xx": 0,
         "3xx": 0,
         "4xx": 0,
@@ -261,30 +303,32 @@ def  count_status_classes(log):
         if code is None:
             continue
 
-        digit = code//100
+        # Dla 404 otrzymamy "4xx", dla 200 -> "2xx" itd.
+        digit = code // 100
         klasa = str(digit) + "xx"
 
         if klasa in counter:
-            counter[klasa]+=1
+            counter[klasa] += 1
 
     return counter
 
-#Zadanie 13. Krotka na słownik
+# Zadanie 13. Krotka na słownik
 def entry_to_dict(entry):
+    # Zamieniamy krotkę na słownik, żeby później odwoływać się do pól po nazwie.
     return {
-        "timestamp": entry[TS],
+        "ts": entry[TS],
         "uid": entry[UID],
-        "ip_host": entry[ORIG_H],
-        "port_host": entry[ORIG_P],
-        "ip_serv": entry[RESP_H],
-        "port_serv": entry[RESP_P],
+        "orig_h": entry[ORIG_H],
+        "orig_p": entry[ORIG_P],
+        "resp_h": entry[RESP_H],
+        "resp_p": entry[RESP_P],
         "method": entry[METHOD],
         "host": entry[HOST],
         "uri": entry[URI],
         "status_code": entry[STATUS_CODE],
     }
 
-#Zadanie 14. log na słownik
+# Zadanie 14. Log na słownik sesji
 def log_to_dict(log):
     result = {}
 
@@ -292,6 +336,7 @@ def log_to_dict(log):
         uid = entry[UID]
         entry_dict = entry_to_dict(entry)
 
+        # Kluczem jest uid sesji, a wartością lista wpisów tej sesji.
         if uid not in result:
             result[uid] = []
 
@@ -299,61 +344,63 @@ def log_to_dict(log):
 
     return result
 
-#Zadanie 15. statystyki sesji
+# Zadanie 15. Statystyki sesji
 def print_dict_entry_dates(log_dict):
-    for uid, entries in log_dict.items(): #.items()bierze pare
+    for uid, entries in log_dict.items():
+        if not entries:
+            continue
 
         print(f"\nUID: {uid}")
 
-        #  ip/hosty tworze zbiory
+        # Zbieramy wszystkie adresy IP i hosty, które pojawiły się w sesji.
         ips = set()
         hosts = set()
 
         for e in entries:
-            ips.add(e["ip_host"])
-            ips.add(e["ip_serv"])
-            hosts.add(e["host"])
+            ips.add(e["orig_h"])
+            ips.add(e["resp_h"])
+            if e["host"] is not None:
+                hosts.add(e["host"])
 
-        #
+        print("Adresy IP:", sorted(ips))
+        print("Hosty:", sorted(hosts))
 
-        print("IP:", ips)
-        print("Hosty:", hosts)
-
-        # liczba żądań
         total = len(entries)
         print("Liczba żądań:", total)
 
-        # zakres czasu
+        # Na podstawie wszystkich znaczników czasu wyznaczamy początek i koniec sesji.
         timestamps = []
-
         for e in entries:
-            timestamps.append(e["timestamp"])
+            timestamps.append(e["ts"])
 
         print("Pierwsze żądanie:", min(timestamps))
         print("Ostatnie żądanie:", max(timestamps))
 
-        # metody http
         methods = {}
         for e in entries:
             m = e["method"]
-            methods[m] = methods.get(m, 0) + 1 #jesli jest to m + inkrementacja
+            if m is None:
+                continue
+            # get(..., 0) oznacza: jeśli klucz nie istnieje, weź wartość 0.
+            methods[m] = methods.get(m, 0) + 1
 
         print("Metody (%):")
         for m, count in methods.items():
             percent = (count / total) * 100
             print(f"  {m}: {percent:.2f}%")
 
-        # kody 2xx
         ok_count = 0
 
         for e in entries:
-            if 200 <= e["status_code"] < 300:
+            status_code = e["status_code"]
+            # Liczymy tylko poprawne odpowiedzi z klasy 2xx.
+            if status_code is not None and 200 <= status_code < 300:
                 ok_count += 1
 
         ratio = ok_count / total
-        print("2xx ratio:", ratio)
+        print("Stosunek kodów 2xx do wszystkich:", ratio)
 
-#Zadanie 16. najaktywniejsza sesja
+# Zadanie 16. Najaktywniejsza sesja
 def get_most_active_session(log_dict):
     max_uid = None
     max_count = 0
@@ -361,13 +408,14 @@ def get_most_active_session(log_dict):
     for uid, entries in log_dict.items():
         count = len(entries)
 
+        # Zapamiętujemy sesję z największą liczbą wpisów.
         if count > max_count:
             max_count = count
             max_uid = uid
 
-    return max_uid, max_count
+    return max_uid
 
-#Zadanie 17.sesje użytkownika
+# Zadanie 17. Odtwarzanie ścieżek sesji użytkownika
 def get_session_paths(log):
     result = {}
 
@@ -378,6 +426,7 @@ def get_session_paths(log):
         if uri is None:
             continue
 
+        # Dla każdego uid tworzymy listę odwiedzonych ścieżek.
         if uid not in result:
             result[uid] = []
 
@@ -385,30 +434,31 @@ def get_session_paths(log):
 
     return result
 
-#Zadanie 18. podejrzane ip
+# Zadanie 18. Podejrzane IP
 def detect_sus(log, threshold):
     if not isinstance(threshold, int):
-        raise TypeError("threshold musi być int")
+        raise TypeError("threshold musi być int.")
 
     if threshold <= 0:
-        raise ValueError("threshold musi być wiekszy od zera")
+        raise ValueError("threshold musi być większy od zera.")
 
     counter = Counter()
 
     for entry in log:
         ip = entry[ORIG_H]
+        # Zliczamy liczbę żądań dla każdego IP.
         counter[ip] += 1
 
     result = []
 
-    for ip, count in counter.items():
-        if count >= threshold:
+    for ip, request_count in counter.items():
+        # Za podejrzane uznajemy adresy przekraczające próg threshold.
+        if request_count >= threshold:
             result.append(ip)
 
     return result
 
-#Zadanie 19. inny format słownika
-#licze ile razy występują rozszerzenia np html
+# Zadanie 19. Rozkład rozszerzeń plików
 def get_extension_stats(log):
     counter = Counter()
 
@@ -419,47 +469,27 @@ def get_extension_stats(log):
         if ext is None:
             continue
 
+        # Powstaje słownik typu {"html": 120, "jpg": 50, ...}.
         counter[ext] += 1
 
     return dict(counter)
 
-#Zadanie 20. analiza
+# Zadanie 20. Mini analiza logu
 def analyze_log(log):
-    if not log:
-        return {}
-
-    # najczęstsze ip
-    top_ip = get_top_ips(log, 1)[0]
-
-    # najczęstsze uri
-    top_uri = get_top_uris(log, 1)[0]
-
-    # rozkład metod
-    methods = count_by_method(log)
-
-    # liczba błędów dla 4 i 5 xx
-    errors = len(get_failed_reads(log, merge=True))
-
-    #liczba różnych adresów ip
-    ip_list = []
-
-    for entry in log:
-        ip_list.append(entry[ORIG_H])
-
-    ip_set = set(ip_list)
-
-    unique_ips = len(ip_set)
-
+    # Zwracamy jedną strukturę z najważniejszymi statystykami logu.
     return {
-        "top_ip": top_ip,
-        "top_uri": top_uri,
-        "methods": methods,
-        "errors": errors,
-        "unique_ips": unique_ips
+        "top_ips": get_top_ips(log, 10),
+        "top_uris": get_top_uris(log, 10),
+        "method_counts": count_by_method(log),
+        "error_count": len(get_failed_reads(log, merge=True)),
+        "status_classes": count_status_classes(log),
+        "extension_stats": get_extension_stats(log),
     }
 
 
 def main():
+    # main() nie jest wymagany przez treść zadań,
+    # ale pozwala szybko pokazać działanie wszystkich funkcji.
     log = read_log()
 
     if not log:
@@ -469,6 +499,7 @@ def main():
     errors_4xx, errors_5xx = get_failed_reads(log)
     merged_errors = get_failed_reads(log, merge=True)
 
+    # Przygotowujemy kilka przykładowych wartości do prezentacji działania funkcji.
     example_code = 200
     if len(get_entries_by_code(log, example_code)) == 0:
         example_code = 404
@@ -540,22 +571,26 @@ def main():
     print("Zadanie 14 - log_to_dict(log)")
     log_dict = log_to_dict(log)
     print("Liczba sesji:", len(log_dict))
-    print("Przykładowa sesja:", next(iter(log_dict.items())))#1 elem ze slownika
+    # Pokazujemy tylko jedną przykładową sesję, żeby nie wypisywać całego słownika.
+    first_uid = next(iter(log_dict))
+    print("Przykładowa sesja UID:", first_uid)
+    print("Przykładowy wpis sesji:", log_dict[first_uid][0])
     print()
 
     print("Zadanie 15 - print_dict_entry_dates(log_dict)")
-    print_dict_entry_dates(log_dict)
+    print_dict_entry_dates({first_uid: log_dict[first_uid]})
     print()
 
     print("Zadanie 16 - get_most_active_session(log_dict)")
-    uid, count = get_most_active_session(log_dict) #zwraca krotke
+    uid = get_most_active_session(log_dict)
+    count = len(log_dict[uid])
     print("Najaktywniejsza sesja:", uid)
     print("Liczba zapytań:", count)
     print()
 
     print("Zadanie 17 - get_session_paths(log)")
     session_paths = get_session_paths(log)
-    print("Przykładowa sesja i jej ścieżki:", next(iter(session_paths.items())))#1 elem
+    print("Przykładowa sesja i jej ścieżki:", next(iter(session_paths.items())))
     print()
 
     print("Zadanie 18 - detect_sus(log, threshold)")
@@ -563,11 +598,24 @@ def main():
     print()
 
     print("Zadanie 19 - get_extension_stats(log)")
-    print("Statystyki rozszerzeń:", get_extension_stats(log))
+    extension_stats = get_extension_stats(log)
+    # Dla czytelności pokazujemy tylko najczęstsze rozszerzenia.
+    top_extensions = sorted(
+        extension_stats.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )[:10]
+    print("Najczęstsze rozszerzenia:", top_extensions)
     print()
 
     print("Zadanie 20 - analyze_log(log)")
-    print("Analiza logu:", analyze_log(log))
+    analysis = analyze_log(log)
+    # Wypisujemy najważniejsze fragmenty analizy zamiast całego słownika naraz.
+    print("Najczęstsze IP:", analysis["top_ips"][:5])
+    print("Najczęstsze URI:", analysis["top_uris"][:5])
+    print("Rozkład metod:", analysis["method_counts"])
+    print("Liczba błędów:", analysis["error_count"])
+    print("Rozkład kodów HTTP:", analysis["status_classes"])
 
     return 0
 
