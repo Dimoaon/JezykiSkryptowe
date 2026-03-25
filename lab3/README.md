@@ -34,7 +34,7 @@ W katalogu `lab3` znajduje się rozwiązanie zadań `1-20` z laboratorium 3.
 Z katalogu głównego projektu:
 
 ```bash
-python3 lab3/http_log.py < lab3/data/http_first_100k.log
+python3 lab3/http_log.py < lab3/data/text.log
 ```
 
 Po uruchomieniu program wypisuje przykładowe wyniki dla wszystkich funkcji
