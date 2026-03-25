@@ -230,6 +230,234 @@ def count_by_method(log):
 
     return result
 
+# Zadanie 11. Najczęściej występujące URI
+def get_top_uris(log, n=10):
+    if not isinstance(n, int):
+        raise TypeError("Wartość musi być liczbą całkowitą")
+
+    if n<=0:
+        raise ValueError("Podany argument n musi być większy od zera ")
+
+    counter = Counter()
+
+    for entry in log:
+        if entry[URI] is not None:
+            counter[entry[URI]] += 1
+
+    return counter.most_common(n)
+
+#Zadanie 12. Grupowanie kodów HTTP
+def  count_status_classes(log):
+    counter={
+        "2xx": 0,
+        "3xx": 0,
+        "4xx": 0,
+        "5xx": 0,
+    }
+
+    for entry in log:
+        code = entry[STATUS_CODE]
+
+        if code is None:
+            continue
+
+        digit = code//100
+        klasa = str(digit) + "xx"
+
+        if klasa in counter:
+            counter[klasa]+=1
+
+    return counter
+
+#Zadanie 13. Krotka na słownik
+def entry_to_dict(entry):
+    return {
+        "timestamp": entry[TS],
+        "uid": entry[UID],
+        "ip_host": entry[ORIG_H],
+        "port_host": entry[ORIG_P],
+        "ip_serv": entry[RESP_H],
+        "port_serv": entry[RESP_P],
+        "method": entry[METHOD],
+        "host": entry[HOST],
+        "uri": entry[URI],
+        "status_code": entry[STATUS_CODE],
+    }
+
+#Zadanie 14. log na słownik
+def log_to_dict(log):
+    result = {}
+
+    for entry in log:
+        uid = entry[UID]
+        entry_dict = entry_to_dict(entry)
+
+        if uid not in result:
+            result[uid] = []
+
+        result[uid].append(entry_dict)
+
+    return result
+
+#Zadanie 15. statystyki sesji
+def print_dict_entry_dates(log_dict):
+    for uid, entries in log_dict.items(): #.items()bierze pare
+
+        print(f"\nUID: {uid}")
+
+        #  ip/hosty tworze zbiory
+        ips = set()
+        hosts = set()
+
+        for e in entries:
+            ips.add(e["ip_host"])
+            ips.add(e["ip_serv"])
+            hosts.add(e["host"])
+
+        #
+
+        print("IP:", ips)
+        print("Hosty:", hosts)
+
+        # liczba żądań
+        total = len(entries)
+        print("Liczba żądań:", total)
+
+        # zakres czasu
+        timestamps = []
+
+        for e in entries:
+            timestamps.append(e["timestamp"])
+
+        print("Pierwsze żądanie:", min(timestamps))
+        print("Ostatnie żądanie:", max(timestamps))
+
+        # metody http
+        methods = {}
+        for e in entries:
+            m = e["method"]
+            methods[m] = methods.get(m, 0) + 1 #jesli jest to m + inkrementacja
+
+        print("Metody (%):")
+        for m, count in methods.items():
+            percent = (count / total) * 100
+            print(f"  {m}: {percent:.2f}%")
+
+        # kody 2xx
+        ok_count = 0
+
+        for e in entries:
+            if 200 <= e["status_code"] < 300:
+                ok_count += 1
+
+        ratio = ok_count / total
+        print("2xx ratio:", ratio)
+
+#Zadanie 16. najaktywniejsza sesja
+def get_most_active_session(log_dict):
+    max_uid = None
+    max_count = 0
+
+    for uid, entries in log_dict.items():
+        count = len(entries)
+
+        if count > max_count:
+            max_count = count
+            max_uid = uid
+
+    return max_uid, max_count
+
+#Zadanie 17.sesje użytkownika
+def get_session_paths(log):
+    result = {}
+
+    for entry in log:
+        uid = entry[UID]
+        uri = entry[URI]
+
+        if uri is None:
+            continue
+
+        if uid not in result:
+            result[uid] = []
+
+        result[uid].append(uri)
+
+    return result
+
+#Zadanie 18. podejrzane ip
+def detect_sus(log, threshold):
+    if not isinstance(threshold, int):
+        raise TypeError("threshold musi być int")
+
+    if threshold <= 0:
+        raise ValueError("threshold musi być wiekszy od zera")
+
+    counter = Counter()
+
+    for entry in log:
+        ip = entry[ORIG_H]
+        counter[ip] += 1
+
+    result = []
+
+    for ip, count in counter.items():
+        if count >= threshold:
+            result.append(ip)
+
+    return result
+
+#Zadanie 19. inny format słownika
+#licze ile razy występują rozszerzenia np html
+def get_extension_stats(log):
+    counter = Counter()
+
+    for entry in log:
+        uri = entry[URI]
+        ext = _get_extension_from_uri(uri)
+
+        if ext is None:
+            continue
+
+        counter[ext] += 1
+
+    return dict(counter)
+
+#Zadanie 20. analiza
+def analyze_log(log):
+    if not log:
+        return {}
+
+    # najczęstsze ip
+    top_ip = get_top_ips(log, 1)[0]
+
+    # najczęstsze uri
+    top_uri = get_top_uris(log, 1)[0]
+
+    # rozkład metod
+    methods = count_by_method(log)
+
+    # liczba błędów dla 4 i 5 xx
+    errors = len(get_failed_reads(log, merge=True))
+
+    #liczba różnych adresów ip
+    ip_list = []
+
+    for entry in log:
+        ip_list.append(entry[ORIG_H])
+
+    ip_set = set(ip_list)
+
+    unique_ips = len(ip_set)
+
+    return {
+        "top_ip": top_ip,
+        "top_uri": top_uri,
+        "methods": methods,
+        "errors": errors,
+        "unique_ips": unique_ips
+    }
+
 
 def main():
     log = read_log()
@@ -295,6 +523,51 @@ def main():
 
     print("Zadanie 10 - count_by_method(log)")
     print("Liczba zapytań per metoda:", count_by_method(log))
+    print()
+
+    print("Zadanie 11 - get_top_uris(log, n=10)")
+    print("Top 10 URI:", get_top_uris(log, 10))
+    print()
+
+    print("Zadanie 12 - count_status_classes(log)")
+    print("Rozkład kodów HTTP:", count_status_classes(log))
+    print()
+
+    print("Zadanie 13 - entry_to_dict(entry)")
+    print("Pierwszy wpis jako dict:", entry_to_dict(log[0]))
+    print()
+
+    print("Zadanie 14 - log_to_dict(log)")
+    log_dict = log_to_dict(log)
+    print("Liczba sesji:", len(log_dict))
+    print("Przykładowa sesja:", next(iter(log_dict.items())))#1 elem ze slownika
+    print()
+
+    print("Zadanie 15 - print_dict_entry_dates(log_dict)")
+    print_dict_entry_dates(log_dict)
+    print()
+
+    print("Zadanie 16 - get_most_active_session(log_dict)")
+    uid, count = get_most_active_session(log_dict) #zwraca krotke
+    print("Najaktywniejsza sesja:", uid)
+    print("Liczba zapytań:", count)
+    print()
+
+    print("Zadanie 17 - get_session_paths(log)")
+    session_paths = get_session_paths(log)
+    print("Przykładowa sesja i jej ścieżki:", next(iter(session_paths.items())))#1 elem
+    print()
+
+    print("Zadanie 18 - detect_sus(log, threshold)")
+    print("Podejrzane ip:", detect_sus(log, 100))
+    print()
+
+    print("Zadanie 19 - get_extension_stats(log)")
+    print("Statystyki rozszerzeń:", get_extension_stats(log))
+    print()
+
+    print("Zadanie 20 - analyze_log(log)")
+    print("Analiza logu:", analyze_log(log))
 
     return 0
 
