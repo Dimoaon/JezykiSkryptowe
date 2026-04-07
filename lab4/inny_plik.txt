@@ -1,0 +1,5 @@
+To jest inny plik
+Linia 2 z innego pliku
+Linia 3 z innego pliku
+Linia 4 z innego pliku
+Linia 5 - koniec innego pliku
