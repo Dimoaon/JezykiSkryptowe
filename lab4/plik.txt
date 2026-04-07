@@ -1,0 +1,15 @@
+Linia 1 - Ala ma kota
+Linia 2 - Kot ma Alę
+Linia 3 - Python jest fajny
+Linia 4 - Zmienne środowiskowe
+Linia 5 - sys.argv to lista argumentów
+Linia 6 - os.environ to słownik zmiennych
+Linia 7 - subprocess uruchamia procesy
+Linia 8 - tail wypisuje ostatnie linie
+Linia 9 - follow czeka na nowe linie
+Linia 10 - PATH zawiera katalogi
+Linia 11 - to jest jedenasta linia
+Linia 12 - to jest dwunasta linia
+Linia 13 - przedostatnia linia
+Linia 14 - ostatnia linia
+nowa linia dodana podczas follow!
