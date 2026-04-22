@@ -52,7 +52,8 @@ def detect_anomalies(
     results: list[dict] = []
 
     for (station, quantity), records in groups.items():
-        # sortujemy chronologicznie – potrzebne do reguły jump
+        # sort jest konieczny dla reguły jump – musimy porównywać KOLEJNE pomiary
+        # bez sortowania moglibyśmy porównać pomiar z marca z pomiarem ze stycznia
         records.sort(key=lambda r: r[0])
 
         all_values = [v for _, v in records]
@@ -81,7 +82,10 @@ def detect_anomalies(
         valid = [(dt, v) for dt, v in records if v is not None]
 
         # ── reguła 2: nagły skok ─────────────────────────────────────────────
-        # zip z przesuniętą listą daje pary sąsiednich pomiarów
+        # zip(valid, valid[1:]) to klasyczny Python trick na pary sąsiednich elementów:
+        # valid      = [(t1,v1), (t2,v2), (t3,v3), ...]
+        # valid[1:]  = [(t2,v2), (t3,v3), ...]
+        # zip daje:  = [(t1,v1,t2,v2), (t2,v2,t3,v3), ...]  czyli kolejne pary
         for (dt1, v1), (dt2, v2) in zip(valid, valid[1:]):
             delta = abs(v2 - v1)
             if delta > delta_threshold:
