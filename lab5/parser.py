@@ -1,114 +1,126 @@
+"""
+Zadanie 1 – funkcje parsujące pliki CSV ze stacjami i pomiarami.
+
+Moduł używa biblioteki csv do odczytu danych oraz logging do rejestrowania
+informacji o otwieranych plikach i odczytywanych wierszach (wymagane przez zad. 6).
+"""
+
 import csv
+import logging
 from pathlib import Path
 
-def to_float(value):
+log = logging.getLogger(__name__)
+
+
+def to_float(value: str) -> float | None:
+    """Konwertuje napis na float, obsługując polski format z przecinkiem."""
     value = value.strip()
     if not value:
         return None
     return float(value.replace(",", "."))
 
 
+# ── stacje ────────────────────────────────────────────────────────────────────
 
-#stacje
-def parse_stations(path: Path):
+def parse_stations(path: Path) -> list[dict]:
+    """Parsuje plik stacje.csv i zwraca listę słowników z danymi stacji.
+
+    Klucze słownika odpowiadają nagłówkom kolumn z pliku CSV.
+    Znaki nowej linii w nagłówkach są zastępowane spacją (artefakt formatu pliku).
+    """
+    result = []
+    log.info("Otwieranie pliku stacji: %s", path)
+
     with path.open(encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f) #dostaje słownik// kolumny = klucze a wartości = wartości
+        reader = csv.DictReader(f)
 
-        result = []
         for row in reader:
+            # logujemy rozmiar każdego odczytanego wiersza (zad. 6a)
+            log.debug("Odczytano wiersz: %d bajtów", len(",".join(row.values()).encode()))
+
+            # nagłówki mogą zawierać \n (wieloliniowe nazwy kolumn w pliku)
             clean_row = {
-                k.replace("\n", " ").strip(): v.strip() if v else v
+                k.replace("\n", " ").strip(): v.strip() if v else ""
                 for k, v in row.items()
-                #przechodze po wszystkich polach w tym wierszu
-                #for k in row:
-                    #v = row[k]
             }
             result.append(clean_row)
 
+    log.info("Zamknięto plik stacji: %s (%d rekordów)", path, len(result))
     return result
 
 
+# ── pomiary ───────────────────────────────────────────────────────────────────
 
-#pliki z pomiarami
+def parse_measurement_file(path: Path) -> list[dict]:
+    """Parsuje plik pomiarowy i zwraca listę słowników – po jednym na stację.
 
-def parse_measurement_file(path: Path):
+    Każdy słownik zawiera:
+      - metadane stacji: "Kod stacji", "Wskaźnik", "Czas uśredniania" itp.
+      - pomiary:         klucz = data (np. "01/01/23 01:00"), wartość = float
+
+    Format pliku (wiersze nagłówkowe przed danymi):
+      wiersz 0: Nr, 1, 2, 3, ...
+      wiersz 1: Kod stacji, DsCzerStraza, ...
+      wiersz 2: Wskaźnik, NO, ...
+      wiersz 3: Czas uśredniania, 1g, ...
+      wiersz 4: Jednostka, ug/m3, ...
+      wiersz 5: Kod stanowiska, ...
+      wiersz 6+: DD/MM/YY HH:MM, wartość, wartość, ...
+    """
+    log.info("Otwieranie pliku pomiarów: %s", path)
+
     with path.open(encoding="utf-8", newline="") as f:
+        reader = csv.reader(f)
         rows = []
 
-        reader = csv.reader(f)
-
         for r in reader:
-            is_not_empty = False
+            # logujemy rozmiar każdego odczytanego wiersza (zad. 6a)
+            log.debug("Odczytano wiersz: %d bajtów", len(",".join(r).encode()))
 
-            for c in r:
-                if c.strip() != "":
-                    is_not_empty = True
-                    break
-
-            if is_not_empty:
+            # pomijamy całkowicie puste wiersze
+            if any(c.strip() for c in r):
                 rows.append(r)
-        #lista wszystkich niepustych wierszy
 
-    # znajduje początek danych czyli 1 wiersz z data
+    log.info("Zamknięto plik pomiarów: %s", path)
+
+    # szukamy pierwszego wiersza z danymi (zawiera datę w formacie DD/MM/YY)
     data_start = 0
-    i = 0
-
-    for row in rows:
-        first = row[0]
-        first = first.strip()
-
-        if first.startswith("20") or "/" in first:
+    for i, row in enumerate(rows):
+        first = row[0].strip()
+        if "/" in first:
             data_start = i
             break
 
-        i += 1
+    headers   = rows[:data_start]   # wiersze z metadanymi (Kod stacji, Wskaźnik, ...)
+    data_rows = rows[data_start:]   # wiersze z pomiarami  (data, wartość, wartość, ...)
 
-    headers = rows[:data_start]
-    data_rows = rows[data_start:]
-
-    # ile kolumn maksymalnie
+    # liczba kolumn = liczba stacji + 1 (pierwsza kolumna to etykieta wiersza)
     num_cols = max(len(h) for h in headers)
 
     result = []
 
-    # każda kolumna
+    # każda kolumna (od 1) odpowiada jednej stacji
     for col in range(1, num_cols):
-        station_dict = {}
+        station_dict: dict = {}
 
+        # przepisujemy metadane z nagłówków do słownika stacji
         for h in headers:
-            if not h:
-                continue
-
-            key = h[0].strip() #1 elem wiersza
+            key = h[0].strip()   # np. "Kod stacji", "Wskaźnik"
             if key and col < len(h):
                 station_dict[key] = h[col].strip()
 
-            #{ efekt koncowy
-               #"Nr": "1",
-               #"Kod stacji": "A",
-               #"Wskaźnik": "PM10"
-            #}
-
-        # pomijam puste kolumny
-        if "Nr" not in station_dict or not station_dict["Nr"]:
+        # pomijamy puste kolumny (brak numeru stacji)
+        if not station_dict.get("Nr"):
             continue
 
-        #{
-            #"Nr": "3",
-            #"Kod stacji": "DsWalbrzWyso"
-        #} poprawna kol
-
-        # wartosci
+        # przepisujemy pomiary: data → wartość float
         for row in data_rows:
             if len(row) <= col:
-                continue #pomijam jak ta kolumna nie istnieje w tym wierszu
-
-            date = row[0].strip()
-            value = row[col].strip()
-
-            if not value:
                 continue
-
+            date  = row[0].strip()
+            value = row[col].strip()
+            if not value:
+                continue  # brak wartości w tym przedziale – pomijamy
             station_dict[date] = to_float(value)
 
         result.append(station_dict)
@@ -119,20 +131,10 @@ def parse_measurement_file(path: Path):
 if __name__ == "__main__":
     base = Path("data")
 
-    #stacje
     stations = parse_stations(base / "stacje.csv")
     print("Stacje:", len(stations))
-    print("Pierwsza stacja:")
-    print(stations[0])
+    print("Pierwsza stacja:", stations[0])
 
-    print("\n\n")
-
-    #pomiary
-    measurements = parse_measurement_file(base / "2023_As(PM10)_24g.csv")
-    print("Stacje w pomiarach:", len(measurements))
-
-    print("\nNr 1:")
-    print(measurements[0])
-
-    print("\nNr 2:")
-    print(measurements[1])
+    measurements = parse_measurement_file(base / "measurements" / "2023_PM10_24g.csv")
+    print("\nStacje w pomiarach:", len(measurements))
+    print("Pierwsza stacja w pomiarach:", {k: v for k, v in list(measurements[0].items())[:8]})

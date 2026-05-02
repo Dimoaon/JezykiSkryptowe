@@ -2,21 +2,22 @@
 Zadanie rozszerzające 1 – CLI zbudowane z użyciem biblioteki Click.
 
 Click vs argparse – główne różnice:
-  - Argumenty i opcje deklaruje się dekoratorami (@click.option) bezpośrednio
-    nad funkcją komendy, zamiast budować parser obiektowo.
-  - Wspólne opcje można zgrupować w dekoratorze wielokrotnego użytku (patrz: common_options).
+  - Opcje deklaruje się dekoratorami (@click.option) bezpośrednio nad funkcją,
+    zamiast budować parser obiektowo przez add_argument().
+  - Wspólne opcje można zgrupować w dekoratorze wielokrotnego użytku (common_options).
   - click.Choice zastępuje ręczną walidację dozwolonych wartości (częstotliwość).
-  - Opis komendy pochodzi automatycznie z docstringa funkcji.
-  - Kluczna różnica w kolejności argumentów:
+  - Opis komendy pochodzi automatycznie z docstringa funkcji – nie trzeba pisać help=.
+  - Kluczna różnica w składni wywołania:
       argparse:  task5.py      --quantity NO --frequency 1g ... random
       click:     task_ext1.py  random --quantity NO --frequency 1g ...
-    W Click opcje należą do podkomendy, więc muszą pojawić się po jej nazwie.
-  - Komunikaty błędów są kolorowane w terminalu (Click używa styled output).
+    W Click opcje należą do podkomendy i muszą pojawić się PO jej nazwie.
+  - Komunikaty błędów są kolorowane w terminalu.
+  - Click oferuje wbudowany CliRunner do testów – łatwiejsze testowanie niż argparse.
 
 Uruchomienie:
-  python task_ext1.py random   --quantity NO  --frequency 1g  --start 2023-01-01 --end 2023-01-31
-  python task_ext1.py stats    --quantity PM10 --frequency 24g --start 2023-06-01 --end 2023-06-30 --station DsWrocWybCon
-  python task_ext1.py anomalies --quantity NO --frequency 1g  --start 2023-01-01 --end 2023-12-31 --delta 50
+  python task_ext1.py random    --quantity NO   --frequency 1g  --start 2023-01-01 --end 2023-01-31
+  python task_ext1.py stats     --quantity PM10 --frequency 24g --start 2023-06-01 --end 2023-06-30 --station DsWrocWybCon
+  python task_ext1.py anomalies --quantity NO   --frequency 1g  --start 2023-01-01 --end 2023-12-31 --delta 50
 """
 
 import logging
@@ -25,9 +26,8 @@ from pathlib import Path
 
 import click
 
-# importujemy logikę biznesową z task5.py i pomocnicze stałe z task_ext2.py
-from task1 import parse_stations, parse_measurements
-from task2 import group_measurement_files_by_key
+from parser import parse_stations, parse_measurement_file
+from group_measurement_files_by_key import group_measurement_files_by_key
 from task5 import (
     cmd_anomalies, cmd_random, cmd_stats,
     find_measurement_file, setup_logging,
@@ -52,7 +52,7 @@ class _DateType(click.ParamType):
                 datetime.strptime(value, "%Y-%m-%d")
                 return value
             except ValueError:
-                # self.fail rzuca UsageError – Click sam formatuje komunikat błędu
+                # self.fail() generuje komunikat błędu i kończy działanie Click
                 self.fail(
                     f"Nieprawidłowa data '{value}' – oczekiwany format: RRRR-MM-DD",
                     param, ctx,
@@ -61,7 +61,7 @@ class _DateType(click.ParamType):
 
 
 class _QuantityType(click.ParamType):
-    """Sprawdza, czy wielkość mierzona zawiera tylko dozwolone znaki."""
+    """Sprawdza format nazwy wielkości mierzonej."""
     name = "WIELKOŚĆ"
 
     def convert(self, value, param, ctx):
@@ -83,11 +83,17 @@ _QUANTITY = _QuantityType()
 # ─────────────────────────────────────────────────────────────────────────────
 
 def common_options(f):
-    """Dokłada do komendy pięć opcji wspólnych dla wszystkich podkomend.
+    """Dodaje do komendy opcje wspólne dla wszystkich podkomend.
 
-    Używamy reversed(), bo dekoratory nakładają się od dołu – bez odwrócenia
-    kolejność opcji w --help byłaby odwrócona względem deklaracji.
+    reversed() jest konieczny, bo dekoratory Python nakładają się od dołu –
+    bez odwrócenia kolejność opcji w --help byłaby odwrócona.
     """
+    # dekoratory Python nakładają się od dołu do góry (jak stos):
+    # @d3        ← nakładany ostatni, ale wywołany pierwszy
+    # @d2
+    # @d1        ← nakładany pierwszy, ale wywołany ostatni
+    # def f(): ...
+    # Bez reversed() opcje w --help byłyby w odwrotnej kolejności niż tu zapisane.
     for decorator in reversed([
         click.option(
             "--data-dir",
@@ -101,7 +107,7 @@ def common_options(f):
         ),
         click.option(
             "--frequency", required=True,
-            type=click.Choice(["1g", "24g"]),  # Click sam generuje komunikat o dozwolonych wartościach
+            type=click.Choice(["1g", "24g"]),  # Click sam buduje komunikat o dozwolonych wartościach
             metavar="CZĘST.",
             help="Częstotliwość pomiaru: 1g lub 24g",
         ),
@@ -119,14 +125,14 @@ def common_options(f):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Pomocnicze – ładowanie danych i namiastka Namespace
+# Namiastka Namespace + funkcja ładująca dane
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _NS:
     """Minimalna imitacja argparse.Namespace.
 
     Pozwala ponownie użyć funkcji cmd_* z task5.py bez ich przepisywania.
-    Zwraca None dla brakujących atrybutów zamiast rzucać AttributeError.
+    __getattr__ zwraca None dla brakujących atrybutów zamiast rzucać AttributeError.
     """
 
     def __init__(self, **kw):
@@ -137,7 +143,10 @@ class _NS:
 
 
 def _load(data_dir: Path, quantity: str, frequency: str):
-    """Wczytuje metadane stacji i plik pomiarowy; kończy program w razie błędu."""
+    """Wczytuje metadane stacji i wskazany plik pomiarowy.
+
+    Kończy program z kodem 1 gdy brakuje pliku lub katalogu (błąd krytyczny).
+    """
     stations_file = data_dir / "stacje.csv"
     meas_dir      = data_dir / "measurements"
 
@@ -159,11 +168,11 @@ def _load(data_dir: Path, quantity: str, frequency: str):
         print(f"Brak pliku danych dla '{quantity}' z częstotliwością '{frequency}'.")
         sys.exit(0)
 
-    return parse_measurements(meas_file), stations
+    return parse_measurement_file(meas_file), stations
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Grupa główna
+# Główna grupa komend
 # ─────────────────────────────────────────────────────────────────────────────
 
 @click.group()
@@ -180,10 +189,10 @@ def cli():
 @common_options
 def cmd_random_click(data_dir, quantity, frequency, start, end):
     """Wypisuje nazwę i adres losowej stacji z danymi w zadanym przedziale."""
-    mdata, stations = _load(data_dir, quantity, frequency)
+    measurements, stations = _load(data_dir, quantity, frequency)
     cmd_random(
         _NS(quantity=quantity, frequency=frequency, start=start, end=end),
-        stations, mdata,
+        stations, measurements,
     )
 
 
@@ -195,11 +204,11 @@ def cmd_random_click(data_dir, quantity, frequency, start, end):
 )
 def cmd_stats_click(data_dir, quantity, frequency, start, end, station):
     """Oblicza średnią i odchylenie standardowe dla wskazanej stacji."""
-    mdata, stations = _load(data_dir, quantity, frequency)
+    measurements, stations = _load(data_dir, quantity, frequency)
     cmd_stats(
         _NS(quantity=quantity, frequency=frequency,
             start=start, end=end, station=station),
-        stations, mdata,
+        stations, measurements,
     )
 
 
@@ -211,7 +220,7 @@ def cmd_stats_click(data_dir, quantity, frequency, start, end, station):
 )
 @click.option(
     "--delta", type=float, default=DEFAULT_DELTA, show_default=True,
-    help="Maksymalny dozwolony skok między kolejnymi pomiarami",
+    help="Maks. dozwolony skok między kolejnymi pomiarami",
 )
 @click.option(
     "--bad-ratio", type=float, default=DEFAULT_BAD_RATIO, show_default=True,
@@ -220,18 +229,14 @@ def cmd_stats_click(data_dir, quantity, frequency, start, end, station):
 def cmd_anomalies_click(data_dir, quantity, frequency, start, end,
                         station, delta, bad_ratio):
     """Wykrywa anomalie w danych pomiarowych (złe dane, skoki, przekroczenia)."""
-    mdata, stations = _load(data_dir, quantity, frequency)
+    measurements, stations = _load(data_dir, quantity, frequency)
     cmd_anomalies(
         _NS(quantity=quantity, frequency=frequency,
             start=start, end=end, station=station,
             delta=delta, bad_ratio=bad_ratio),
-        stations, mdata,
+        stations, measurements,
     )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Punkt wejściowy
-# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     cli()
