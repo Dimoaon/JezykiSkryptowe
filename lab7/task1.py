@@ -4,63 +4,47 @@
 from functools import reduce
 
 
-# a) Akronim – bierzemy pierwszą literę każdego słowa i zamieniamy na wielką.
-# map() aplikuje lambdę do każdego elementu listy, join() skleja wyniki w jeden string.
+# a) Bierzemy pierwszą literę każdego słowa i sklejamy w jeden string.
 def acronym(words: list[str]) -> str:
     return "".join(map(lambda w: w[0].upper(), words))
 
 
-# b) Mediana – sortujemy listę, a potem patrzymy na środkowy element.
-# Jeśli liczba elementów nieparzysta – środkowy element to mediana.
-# Jeśli parzysta – uśredniamy dwa środkowe elementy.
-# Operator trójargumentowy (a if cond else b) zastępuje instrukcję if.
+# b) Sortujemy listę; operator trójargumentowy wybiera środkowy element (lub średnią dwóch).
 def median(lst: list[float]) -> float:
     s = sorted(lst)
     n = len(s)
     return s[n // 2] if n % 2 != 0 else (s[n // 2 - 1] + s[n // 2]) / 2
 
 
-# c) Pierwiastek metodą Newtona – zamiast pętli while używamy rekurencji.
-# Wzór: nowe przybliżenie = (y + x/y) / 2
-# Startujemy od y = x/2 (domyślny argument), powtarzamy aż błąd < epsilon.
-# Warunek stopu: |y² - x| < epsilon, też przez operator trójargumentowy.
+# c) Rekurencja zastępuje pętlę while; wzór Newtona: y_new = (y + x/y) / 2.
 def pierwiastek(x: float, epsilon: float, y: float | None = None) -> float:
     y = x / 2 if y is None else y
     return y if abs(y * y - x) < epsilon else pierwiastek(x, epsilon, (y + x / y) / 2)
 
 
-# d) Słownik litera → słowa zawierające tę literę.
-# dict.fromkeys() zbiera unikalne litery zachowując kolejność pierwszego wystąpienia.
-# Następnie dict comprehension dla każdej litery filtruje słowa ją zawierające.
+# d) dict.fromkeys() zbiera unikalne litery zachowując kolejność pierwszego wystąpienia.
 def make_alpha_dict(text: str) -> dict[str, list[str]]:
     words = text.split()
-    # generator expression wewnątrz dict.fromkeys – odpowiednik podwójnej pętli for
     chars = dict.fromkeys(c for w in words for c in w if c.isalpha())
     return {c: [w for w in words if c in w] for c in chars}
 
 
-# e) Spłaszczanie listy – działa na dowolnym poziomie zagnieżdżenia.
-# reduce() przetwarza listę element po elemencie, akumulując wynik w acc.
-# Jeśli element jest listą lub krotką – rekurencyjnie spłaszczamy go dalej.
-# Jeśli element skalarny – po prostu dodajemy go do akumulatora.
+# e) reduce() spłaszcza rekurencyjnie – działa na dowolnym poziomie zagnieżdżenia.
 def flatten(lst: list) -> list:
     return reduce(
         lambda acc, x: acc + (flatten(x) if isinstance(x, (list, tuple)) else [x]),
         lst,
-        [],  # akumulator startowy – pusta lista
+        [],
     )
 
 
-# f) Grupowanie anagramów – kluczem jest słowo z literami posortowanymi alfabetycznie.
-# "kot" i "tok" mają ten sam klucz "kot", więc trafiają do jednej grupy.
-# reduce() buduje słownik krok po kroku: dla każdego słowa oblicza klucz,
-# a potem dopisuje słowo do istniejącej listy (lub tworzy nową przez d.get(..., [])).
+# f) Klucz kanoniczny: litery posortowane → anagramy mają ten sam klucz.
 def group_anagrams(words: list[str]) -> dict[str, list[str]]:
-    key = lambda w: "".join(sorted(w))  # klucz kanoniczny: litery posortowane
+    key = lambda w: "".join(sorted(w))
     return reduce(
         lambda d, w: {**d, key(w): d.get(key(w), []) + [w]},
         words,
-        {},  # akumulator startowy – pusty słownik
+        {},
     )
 
 

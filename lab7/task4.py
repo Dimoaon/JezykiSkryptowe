@@ -1,34 +1,25 @@
 # Zadanie 4 – make_generator() za pomocą domknięcia (closure).
-# Funkcja make_generator() przyjmuje jednoargumentową funkcję f
-# i zwraca generator obliczający f(1), f(2), f(3), … bez końca.
-# Zamiast klasy z __next__ używamy składni `yield` – Python sam tworzy obiekt generatora.
+# Wewnętrzna funkcja z yield tworzy obiekt generatora i „pamięta" f z zewnętrznego zakresu.
 
 from math import factorial
 
 
 def make_generator(f):
-    # Wewnętrzna funkcja generatorowa: `yield` zawiesza wykonanie i zwraca wartość
-    # do wywołującego; przy kolejnym next() wznawia od miejsca zawieszenia.
-    # Domknięcie (closure) – wewnętrzna funkcja „pamięta" f z zewnętrznego zakresu.
     def generator():
         n = 1
-        while True:          # generator nieskończony – StopIteration przez next() na zewnątrz
-            yield f(n)
+        while True:
+            yield f(n)  # yield zawiesza wykonanie i zwraca wartość; next() wznawia
             n += 1
-    return generator()       # zwracamy gotowy obiekt generatora, nie samą funkcję
+    return generator()
 
-
-# ---------- pomocnicze funkcje do testów ----------
 
 def fibonacci(n: int) -> int:
-    # n-ta liczba Fibonacciego (F(1)=1, F(2)=1, F(3)=2, …) – wariant rekurencyjny.
-    # Wolny dla dużych n, ale wystarczający do demonstracji (memoizacja w task5.py).
+    # rekurencja bez memoizacji – wolna dla dużych n (patrz task5)
     return 1 if n <= 2 else fibonacci(n - 1) + fibonacci(n - 2)
 
 
 def catalan(n: int) -> int:
-    # n-ta liczba Catalana: C(n) = (2n)! / ((n+1)! * n!)
-    # C(1)=1, C(2)=2, C(3)=5, C(4)=14, …
+    # C(n) = (2n)! / ((n+1)! * n!)
     return factorial(2 * n) // (factorial(n + 1) * factorial(n))
 
 

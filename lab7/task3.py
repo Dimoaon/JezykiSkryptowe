@@ -1,5 +1,5 @@
 # Zadanie 3 – klasa PasswordGenerator implementująca protokół iteratora.
-# Protokół iteratora w Pythonie wymaga dwóch metod: __iter__ i __next__.
+# __iter__ zwraca self – obiekt jest jednocześnie iteratorem i iterable.
 
 import random
 import string
@@ -9,24 +9,21 @@ class PasswordGenerator:
     def __init__(
         self,
         length: int,
-        charset: str = string.ascii_letters + string.digits,  # domyślnie litery + cyfry
-        count: int = 10,  # maksymalna liczba haseł do wygenerowania
+        charset: str = string.ascii_letters + string.digits,
+        count: int = 10,
     ):
         self.length = length
         self.charset = charset
         self.count = count
-        self._generated = 0  # licznik – ile haseł już zwrócono
+        self._generated = 0
 
-    # __iter__ zwraca sam obiekt – dzięki temu klasa jest jednocześnie iteratorem i iterable.
-    # To pozwala używać jej zarówno w pętli for jak i z next().
     def __iter__(self):
         return self
 
-    # __next__ zwraca kolejne hasło lub podnosi StopIteration po wyczerpaniu limitu.
-    # random.choices losuje k znaków z charset ze zwracaniem (możliwe powtórzenia).
+    # Podnosimy StopIteration po wygenerowaniu count haseł.
     def __next__(self) -> str:
         if self._generated >= self.count:
-            raise StopIteration  # sygnał dla pętli for że iterator się skończył
+            raise StopIteration
         self._generated += 1
         return "".join(random.choices(self.charset, k=self.length))
 

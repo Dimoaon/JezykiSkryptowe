@@ -1,29 +1,19 @@
 # Zadanie 2 – funkcje wyższego rzędu przyjmujące predykat i iterable.
-# pred – funkcja jednoargumentowa zwracająca True/False (predykat).
-# Wszystkie implementacje opierają się na wbudowanych funkcjach funkcyjnych Pythona.
 
-
-# forall – odpowiednik logicznego "dla każdego" (∀).
-# all() zwraca True tylko jeśli wszystkie elementy są prawdziwe.
-# map(pred, iterable) aplikuje predykat do każdego elementu – dostajemy listę bool.
+# all/any mają lazy evaluation – zatrzymują się przy pierwszym decydującym elemencie.
 def forall(pred, iterable) -> bool:
     return all(map(pred, iterable))
 
 
-# exists – odpowiednik logicznego "istnieje" (∃).
-# any() zwraca True jeśli choć jeden element jest prawdziwy – i od razu się zatrzymuje.
 def exists(pred, iterable) -> bool:
     return any(map(pred, iterable))
 
 
-# atleast – co najmniej n elementów spełnia predykat.
-# sum() na liście bool zlicza True (True == 1, False == 0).
+# sum() zlicza True jak jedynki (True == 1, False == 0).
 def atleast(n: int, pred, iterable) -> bool:
     return sum(map(pred, iterable)) >= n
 
 
-# atmost – co najwyżej n elementów spełnia predykat.
-# Ta sama technika: zliczamy True i sprawdzamy czy nie przekraczamy n.
 def atmost(n: int, pred, iterable) -> bool:
     return sum(map(pred, iterable)) <= n
 

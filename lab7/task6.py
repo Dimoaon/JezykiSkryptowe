@@ -1,15 +1,10 @@
-# Zadanie 6 – dekorator @log rejestrujący wywołania funkcji i klas.
-# Dekorator przyjmuje poziom logowania jako argument (logging.DEBUG, logging.INFO, itp.).
-# Dla funkcji loguje: czas wywołania, nazwę, argumenty, czas trwania, wartość zwróconą.
-# Dla klas loguje: moment tworzenia obiektu (wywołanie __init__).
+# Zadanie 6 – dekorator @log logujący wywołania funkcji i tworzenie obiektów klas.
+# Trójpoziomowa struktura (log → decorator → wrapper) potrzebna, bo dekorator przyjmuje argument.
+# isinstance(obj, type) rozróżnia klasę od funkcji.
 
 import logging
 import time
 import functools
-
-
-# Konfiguracja modułu logging – format z datą i poziomem.
-# basicConfig działa tylko jeśli handler nie został jeszcze ustawiony.
 import sys
 
 logging.basicConfig(
@@ -21,46 +16,36 @@ logging.basicConfig(
 
 
 def log(level=logging.DEBUG):
-    # log() jest fabryką dekoratorów: zwraca właściwy dekorator dla podanego poziomu.
-    # Dwupoziomowa struktura (log → decorator → wrapper) jest konieczna, bo dekorator
-    # z argumentami musi być wywoływalny na dwa sposoby: @log() i @log(logging.INFO).
-
     def decorator(obj):
-        # Rozróżniamy czy dekorowany obiekt to klasa czy funkcja.
         if isinstance(obj, type):
             return _log_class(obj, level)
         return _log_function(obj, level)
-
     return decorator
 
 
 def _log_function(func, level):
-    @functools.wraps(func)  # zachowuje __name__, __doc__ itp. oryginalnej funkcji
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # Formatujemy argumenty do czytelnego stringa – pozycyjne i słownikowe osobno.
         args_repr = [repr(a) for a in args]
         kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
         signature = ", ".join(args_repr + kwargs_repr)
 
         call_time = time.strftime("%H:%M:%S")
         t_start = time.perf_counter()
-
         result = func(*args, **kwargs)
-
         duration = time.perf_counter() - t_start
+
         logging.log(
             level,
             f"[{call_time}] {func.__name__}({signature}) "
             f"→ {result!r}  ({duration * 1000:.2f} ms)",
         )
         return result
-
     return wrapper
 
 
 def _log_class(cls, level):
-    # Dekorujemy __init__ klasy – każde tworzenie obiektu zostanie zalogowane.
-    # Nie tworzymy nowej klasy (unikamy problemów z dziedziczeniem i isinstance).
+    # Modyfikujemy __init__ zamiast tworzyć nową klasę – unikamy problemów z isinstance.
     original_init = cls.__init__
 
     @functools.wraps(original_init)
@@ -84,28 +69,28 @@ def _log_class(cls, level):
 
 # ---------- demonstracja ----------
 
-@log()                          # poziom domyślny: DEBUG
+@log()
 def add(a, b):
     return a + b
 
 
-@log(logging.INFO)              # poziom INFO
+@log(logging.INFO)
 def multiply(a, b):
     return a * b
 
 
-@log(logging.WARNING)           # poziom WARNING – widoczny nawet przy wyższym filtrze
+@log(logging.WARNING)
 def divide(a, b):
     return a / b
 
 
-@log(logging.INFO)              # dekorowanie klasy – loguje __init__
+@log(logging.INFO)
 class Rectangle:
     def __init__(self, width, height):
         self.width = width
         self.height = height
 
-    @log()                      # metody klasy też można dekorować
+    @log()
     def area(self):
         return self.width * self.height
 
@@ -123,13 +108,12 @@ if __name__ == "__main__":
 
     print()
 
-    rect = Rectangle(5, 3)      # loguje tworzenie obiektu
-    rect.area()                 # loguje wywołanie metody
+    rect = Rectangle(5, 3)
+    rect.area()
     rect.perimeter()
 
     print()
 
-    # Funkcja z wieloma typami argumentów
     @log(logging.INFO)
     def greet(name, greeting="Cześć"):
         return f"{greeting}, {name}!"
